@@ -1,106 +1,96 @@
 from datetime import datetime
 from unittest import TestCase
+from unittest.mock import patch
 
 from models.parquimetro import Parquimetro
 from models.plaza import Ocupacion
 from services.administrar_parquimetro import AdministrarParking
 
 
+@patch("services.administrar_parquimetro.datetime")
 class TestValidarTarea(TestCase):
 
+    @classmethod
     def setUpClass(cls) -> None:
+        '''
+        Se inicializan una vez para todos los tests -> 1 vez
+        :return:
+        '''
         cls.administrar_parking = AdministrarParking()
+        cls.start_date = datetime(2022, 10, 16, 10, 53, 23, 459111)
+        cls.end_date = datetime(2022, 10, 16, 14, 53, 23, 459111)
 
     def setUp(self) -> None:
+        '''
+        Se inicializa una vez por test -> 8 veces
+        :return:
+        '''
         self.parquimetro = Parquimetro(9)
 
-    def test_validar_tamano_parquimetro(self):
-        assert (len(self.parquimetro.lista_plazas) == 87)
+    def test_validar_tamano_parquimetro(self, _):
+        self.assertEqual(len(self.parquimetro.lista_plazas), 87)
 
-    def test_validar_aparcar_coche(self):
-        parquimetro = Parquimetro(9)
-        # quitar esto-> como hacer para no tener que inicializar el objeto??
-        adm = AdministrarParking()
-        start_date = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        plaza = adm.aparcar_coche("123", parquimetro, start_date)
-        assert (plaza.id in range(0, 87))
-        assert (plaza.estado == Ocupacion.OCUPADO)
+    def test_validar_aparcar_coche(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        plaza = self.administrar_parking.aparcar_coche("123", self.parquimetro)
 
-    def test_desaparcar_coche(self):
-        parquimetro = Parquimetro(9)
-        # quitar esto-> como hacer para no tener que inicializar el objeto??
-        adm = AdministrarParking()
-        start_date = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        plaza = adm.aparcar_coche("123", parquimetro, start_date)
-        end_date = datetime(2022, 10, 16, 14, 53, 23, 459111)
-        importe = adm.desaparcar_coche("123", parquimetro, end_date)
-        assert plaza.estado == Ocupacion.LIBRE
-        assert plaza.coche is None
-        diff = end_date - start_date
-        duration_in_s = diff.total_seconds()
-        hours = divmod(duration_in_s, 3600)[0]
-        assert (importe == parquimetro.tarifa * hours)
+        self.assertIn(plaza.id, range(0, 87))
+        self.assertEqual(plaza.estado, Ocupacion.OCUPADO)
+        self.assertEqual(plaza.coche.placa, "123")
+        self.assertEqual(plaza.coche.start_date, self.start_date)
 
-    def test_calcular_total_importe(self):
-        parquimetro = Parquimetro(9)
-        adm = AdministrarParking()
+    def test_desaparcar_coche(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        plaza = self.administrar_parking.aparcar_coche("123", self.parquimetro)
+        datetime_mock.datetime.now.return_value = self.end_date
+        importe = self.administrar_parking.desaparcar_coche("123", self.parquimetro)
 
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("123", parquimetro, start_date_1)
-        end_date_1 = datetime(2022, 10, 16, 14, 53, 23, 459111)
-        importe_1 = adm.desaparcar_coche("123", parquimetro, end_date_1)
+        self.assertEqual(plaza.estado, Ocupacion.LIBRE)
+        self.assertIsNone(plaza.coche)
+        self.assertEqual(importe, 36)
 
-        start_date_2 = datetime(2022, 10, 16, 6, 53, 23, 459111)
-        adm.aparcar_coche("223", parquimetro, start_date_2)
-        end_date_2 = datetime(2022, 10, 16, 19, 53, 23, 459111)
-        importe_2 = adm.desaparcar_coche("223", parquimetro, end_date_2)
+    def test_calcular_total_importe(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        self.administrar_parking.aparcar_coche("123", self.parquimetro)
+        self.administrar_parking.aparcar_coche("223", self.parquimetro)
+        datetime_mock.datetime.now.return_value = self.end_date
+        importe_1 = self.administrar_parking.desaparcar_coche("123", self.parquimetro)
+        importe_2 = self.administrar_parking.desaparcar_coche("223", self.parquimetro)
 
-        assert (adm.total_importe(parquimetro) == importe_1 + importe_2)
+        self.assertEqual(self.administrar_parking.total_importe(self.parquimetro), importe_1 + importe_2)
 
-    def test_validar_matricula_coche_desaparcado(self):
-        parquimetro = Parquimetro(9)
-        adm = AdministrarParking()
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("123", parquimetro, start_date_1)
-        end_date_1 = datetime(2022, 10, 16, 14, 53, 23, 459111)
+    def test_validar_matricula_coche_desaparcado(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        self.administrar_parking.aparcar_coche("123", self.parquimetro)
+        datetime_mock.datetime.now.return_value = self.end_date
         with self.assertRaises(ValueError):
-            adm.desaparcar_coche("224", parquimetro, end_date_1)
+            self.administrar_parking.desaparcar_coche("224", self.parquimetro)
 
-    def test_calcular_plazas_libres(self):
-        parquimetro = Parquimetro(9)
-        adm = AdministrarParking()
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("123", parquimetro, start_date_1)
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("222", parquimetro, start_date_1)
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("333", parquimetro, start_date_1)
+    def test_calcular_plazas_libres(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        self.administrar_parking.aparcar_coche("123", self.parquimetro)
+        self.administrar_parking.aparcar_coche("222", self.parquimetro)
+        self.administrar_parking.aparcar_coche("333", self.parquimetro)
 
-        num = adm.num_puestos_libres(parquimetro)
+        plazas_libres = self.administrar_parking.num_puestos_libres(self.parquimetro)
 
-        assert (num == 84)
+        self.assertEqual(plazas_libres, 84)
 
-    def test_coche_ya_aparcado(self):
-        parquimetro = Parquimetro(9)
-        adm = AdministrarParking()
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("123", parquimetro, start_date_1)
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
+    def test_coche_ya_aparcado(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        self.administrar_parking.aparcar_coche("123", self.parquimetro)
         with self.assertRaises(ValueError):
-            adm.aparcar_coche("123", parquimetro, start_date_1)
+            self.administrar_parking.aparcar_coche("123", self.parquimetro)
 
-    def test_validar_importe_total_misma_plaza(self):
-        parquimetro = Parquimetro(9)
-        adm = AdministrarParking()
+    def test_validar_importe_total_misma_plaza(self, datetime_mock):
+        datetime_mock.datetime.now.return_value = self.start_date
+        self.administrar_parking.aparcar_coche("123", self.parquimetro)
+        datetime_mock.datetime.now.return_value = self.end_date
+        importe_1 = self.administrar_parking.desaparcar_coche("123", self.parquimetro)
 
-        start_date_1 = datetime(2022, 10, 16, 10, 53, 23, 459111)
-        adm.aparcar_coche("123", parquimetro, start_date_1)
-        end_date_1 = datetime(2022, 10, 16, 14, 53, 23, 459111)
-        importe_1 = adm.desaparcar_coche("123", parquimetro, end_date_1)
+        datetime_mock.datetime.now.return_value = datetime(2022, 10, 18, 6, 53, 23, 459111)
+        self.administrar_parking.aparcar_coche("222", self.parquimetro)
+        datetime_mock.datetime.now.return_value = datetime(2022, 10, 18, 19, 53, 23, 459111)
+        importe_2 = self.administrar_parking.desaparcar_coche("222", self.parquimetro)
 
-        start_date_2 = datetime(2022, 10, 18, 6, 53, 23, 459111)
-        adm.aparcar_coche("222", parquimetro, start_date_2)
-        end_date_2 = datetime(2022, 10, 18, 19, 53, 23, 459111)
-        importe_2 = adm.desaparcar_coche("222", parquimetro, end_date_2)
-
-        assert adm.total_importe(parquimetro) == importe_1 + importe_2
+        self.assertEqual(self.administrar_parking.total_importe(self.parquimetro), importe_1 + importe_2)

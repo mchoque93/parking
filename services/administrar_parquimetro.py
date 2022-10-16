@@ -11,28 +11,28 @@ import datetime
 class AdministrarParking():
 
 
-    def aparcar_coche(self, matricula:str, parquimetro: Parquimetro, start_date: datetime):
+    def aparcar_coche(self, matricula:str, parquimetro: Parquimetro):
         plaza=next((plaza for plaza in parquimetro.lista_plazas if plaza.estado==Ocupacion.LIBRE),None)
+        start_date=datetime.datetime.now()
         self.validar_ocupacion(plaza)
         self.validar_coche_ya_aparcado(matricula, parquimetro)
-        #start_date=datetime.datetime.now()
         self.validar_hora(start_date)
         coche=Coche(matricula, start_date)
         plaza.estado=Ocupacion.OCUPADO
         plaza.coche=coche
         return plaza
 
-    def get_tiempo(self, plaza: Plaza, end_time: datetime):
-        #end_time = datetime.datetime.now()
+    def get_tiempo(self, plaza: Plaza):
+        end_time = datetime.datetime.now()
         difference = end_time - plaza.coche.start_date
         duration_in_s = difference.total_seconds()
         hours = divmod(duration_in_s, 3600)[0]
         return hours
 
-    def desaparcar_coche(self, matricula:str, parquimetro: Parquimetro, end_time: datetime):
+    def desaparcar_coche(self, matricula:str, parquimetro: Parquimetro):
         plaza=self.get_plaza_matricula(matricula, parquimetro)
         self.validar_desaparcar_coche_no_aparcado(plaza)
-        importe=self.get_tiempo(plaza, end_time)*parquimetro.tarifa
+        importe=self.get_tiempo(plaza)*parquimetro.tarifa
         plaza.lista_importes.append(importe)
         plaza.estado=Ocupacion.LIBRE
         plaza.coche=None
